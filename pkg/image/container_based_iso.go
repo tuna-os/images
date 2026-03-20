@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 
+	"github.com/osbuild/images/pkg/arch"
 	"github.com/osbuild/images/pkg/artifact"
 	"github.com/osbuild/images/pkg/container"
 	"github.com/osbuild/images/pkg/manifest"
@@ -113,9 +114,16 @@ func (img *ContainerBasedIso) InstantiateManifestFromContainer(m *manifest.Manif
 	isoTreePipeline.InitramfsPath = img.InitramfsPath
 	isoTreePipeline.KernelOpts = kernelOpts
 
+	// Only include BIOS (MBR) boot support on x86_64; aarch64 and other
+	// architectures are EFI-only and don't have /usr/lib/grub/i386-pc.
+	isoBootType := manifest.Grub2UEFIOnlyISOBoot
+	if img.platform.GetArch() == arch.ARCH_X86_64 {
+		isoBootType = manifest.Grub2ISOBoot
+	}
+
 	isoCustomizations := manifest.ISOCustomizations{
 		Label:    img.ISOLabel,
-		BootType: manifest.Grub2ISOBoot,
+		BootType: isoBootType,
 	}
 
 	isoPipeline := manifest.NewISO(buildPipeline, isoTreePipeline, isoCustomizations)
