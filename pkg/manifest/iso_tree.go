@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/osbuild/images/internal/common"
+	"github.com/osbuild/images/pkg/arch"
 	"github.com/osbuild/images/pkg/disk"
 	"github.com/osbuild/images/pkg/osbuild"
 )
@@ -243,15 +244,18 @@ func (p *ISOTree) serialize() (osbuild.Pipeline, error) {
 		}
 	}
 
-	if p.bootTreePipeline != nil && p.bootTreePipeline.Platform != nil {
-		options.FIPS = p.bootTreePipeline.Platform.GetFIPSMenu()
+	// Only add BIOS grub stages on x86_64; aarch64 uses EFI-only boot
+	if p.bootTreePipeline == nil || p.bootTreePipeline.Platform == nil ||
+		p.bootTreePipeline.Platform.GetArch() == arch.ARCH_X86_64 {
+		if p.bootTreePipeline != nil && p.bootTreePipeline.Platform != nil {
+			options.FIPS = p.bootTreePipeline.Platform.GetFIPSMenu()
+		}
+		stage := osbuild.NewGrub2ISOLegacyStage(options)
+		pipeline.AddStage(stage)
+
+		// Add a stage to create the eltorito.img file for grub2 BIOS boot support
+		pipeline.AddStage(osbuild.NewGrub2InstStage(osbuild.NewGrub2InstISO9660StageOption("images/eltorito.img", "/boot/grub2")))
 	}
-
-	stage := osbuild.NewGrub2ISOLegacyStage(options)
-	pipeline.AddStage(stage)
-
-	// Add a stage to create the eltorito.img file for grub2 BIOS boot support
-	pipeline.AddStage(osbuild.NewGrub2InstStage(osbuild.NewGrub2InstISO9660StageOption("images/eltorito.img", "/boot/grub2")))
 
 	// Create EFI boot partition
 	filename := "images/efiboot.img"
